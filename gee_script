@@ -50,25 +50,19 @@ var s1 = ee.ImageCollection('COPERNICUS/S1_GRD')
 var asc = s1.filter(ee.Filter.eq('orbitProperties_pass', 'ASCENDING'));
 var desc = s1.filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING'));
 var vvvhAsc = asc
-// Filter to get images with VV and VH single polarization
 .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
 .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH'))
-// Filter to get images collected in interferometric wide swath mode.
 .filter(ee.Filter.eq('instrumentMode', 'IW'));
 var vvvhDesc = desc
-// Filter to get images with VV and VH dual polarization
 .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
 .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH'))
-// Filter to get images collected in interferometric wide swath mode.
 .filter(ee.Filter.eq('instrumentMode', 'IW'));
-// Create a composite from means at different polarizations and look angles.
 var composite = ee.Image.cat([
 vvvhAsc.select('VV').median(),
 vvvhAsc.select('VH').median(),
 vvvhDesc.select('VV').median(),
 vvvhDesc.select('VH').median(),
 ]).clip(geometry2);
-// Rename the bands so you can identify them when they are all joined together
 var s1comp = composite.select(
 ['VV','VH','VV_1','VH_1'], 
 ['s1vva','s1vha','s1vvd','s1vhd'] 
