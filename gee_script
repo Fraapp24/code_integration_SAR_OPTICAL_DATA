@@ -1,0 +1,113 @@
+var image = ee.Image(ee.ImageCollection('COPERNICUS/S2')
+    .filterBounds(roi)
+    .filterDate('2020-01-01', '2021-08-01')
+    .sort('CLOUD_COVER')
+    .first());
+Map.addLayer(image, {bands: ['B4', 'B3', 'B2'],min:0, max: 3000}, 'True colour image');
+print(image)
+var classNames = waterarea.merge(urban).merge(nourban);
+print(classNames)
+var bands = ['B2', 'B3', 'B4', 'B5', 'B6', 'B7'];
+var training = image.select(bands).sampleRegions({
+  collection: classNames,
+  properties: ['landcover'],
+  scale: 30
+});
+print(training);
+var classifier = ee.Classifier.smileCart().train({
+  features: training,
+  classProperty: 'landcover',
+  inputProperties: bands
+});
+
+var classified = image.select(bands).classify(classifier);
+
+Map.centerObject(classNames, 11);
+Map.addLayer(classified,
+{min: 1, max: 3, palette: ['blue', 'white', 'red']},
+'classification');
+
+var valNames = vwater.merge(vurban).merge(vnourban);
+
+var validation = classified.sampleRegions({
+  collection: valNames,
+  properties: ['landcover'],
+  scale: 30,
+});
+print(validation);
+
+
+var testAccuracy = validation.errorMatrix('landcover', 'classification');
+print('Validation error matrix: ', testAccuracy);
+print('Validation overall accuracy: ', testAccuracy.accuracy());
+
+//Sentinel-1
+
+var s1 = ee.ImageCollection('COPERNICUS/S1_GRD')
+.filterBounds(geometry2) // Draw your AOI in the map area
+.filterDate('2020-01-01', '2021-08-01');
+
+var asc = s1.filter(ee.Filter.eq('orbitProperties_pass', 'ASCENDING'));
+var desc = s1.filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING'));
+var vvvhAsc = asc
+// Filter to get images with VV and VH single polarization
+.filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
+.filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH'))
+// Filter to get images collected in interferometric wide swath mode.
+.filter(ee.Filter.eq('instrumentMode', 'IW'));
+var vvvhDesc = desc
+// Filter to get images with VV and VH dual polarization
+.filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
+.filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH'))
+// Filter to get images collected in interferometric wide swath mode.
+.filter(ee.Filter.eq('instrumentMode', 'IW'));
+// Create a composite from means at different polarizations and look angles.
+var composite = ee.Image.cat([
+vvvhAsc.select('VV').median(),
+vvvhAsc.select('VH').median(),
+vvvhDesc.select('VV').median(),
+vvvhDesc.select('VH').median(),
+]).clip(geometry2);
+// Rename the bands so you can identify them when they are all joined together
+var s1comp = composite.select(
+['VV','VH','VV_1','VH_1'], 
+['s1vva','s1vha','s1vvd','s1vhd'] 
+);
+
+print(s1comp)
+
+var imageallbands=['s1vva','s1vha','s1vvd','s1vhd'];
+var imagecomposta=s1comp.addBands(image,bands,true);
+var totalbands=['s1vva','s1vha','s1vvd','s1vhd','B2', 'B3', 'B4', 'B5', 'B6', 'B7'];
+var training2 = imagecomposta.select(totalbands).sampleRegions({
+  collection: classNames,
+  properties: ['landcover'],
+  scale: 30
+});
+print(training2);
+var classifier2 = ee.Classifier.smileCart().train({
+  features: training2,
+  classProperty: 'landcover',
+  inputProperties: totalbands
+});
+
+
+var classified2 = imagecomposta.select(totalbands).classify(classifier2);
+
+Map.centerObject(classNames, 11);
+Map.addLayer(classified2,
+{min: 1, max: 3, palette: ['blue', 'white', 'red']},
+'classification2');
+
+var valNames = vwater.merge(vurban).merge(vnourban);
+var validation = classified2.sampleRegions({
+  collection: valNames,
+  properties: ['landcover'],
+  scale: 30,
+});
+print(validation);
+
+
+var testAccuracy = validation.errorMatrix('landcover', 'classification');
+print('Validation error matrix2: ', testAccuracy);
+print('Validation overall accuracy2: ', testAccuracy.accuracy());
